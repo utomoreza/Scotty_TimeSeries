@@ -1,0 +1,2 @@
+"0","scotty <- scotty %>% select(start_time, src_sub_area)"
+"0","scotty$start_time <- ymd_hms(scotty$start_time)"

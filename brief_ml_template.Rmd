@@ -1,0 +1,94 @@
+---
+title: "Brief Capstone Machine Learning"
+author: "Team Algoritma"
+date: "`r Sys.Date()`"
+output: 
+ html_document:
+   toc: true
+   toc_float: true
+   highlight: zenburn
+   df_print: paged
+   theme: flatly
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+File ini berisi template untuk menjawab pertanyaan saat briefing Capstone Machine Learning sebagai langkah awal sebelum membuat model. Silakan Bapak/Ibu mengisi jawaban di bawah. 
+
+File ini tidak akan dinilai namun Bapak/Ibu **WAJIB** disubmit ke dalam classroom pada hari H briefing Capstone Machine Learning.
+
+# Case
+
+Case yang dipilih adalah: **Scotty - Time Series**
+
+# Data Preprocessing
+
+Tentukan langkah-langkah yang akan dilakukan dalam Data Preprocessing:
+
+- Load library yang perlu dan import data train
+
+```{r}
+library(tidyverse)
+library(lubridate)
+library(purrr)
+```
+
+```{r}
+scotty <- read.csv("data/data-train.csv")
+scotty
+```
+
+- `select` hanya dua kolom, yaitu `start_time` dan `src_sub_area`
+
+```{r}
+scotty <- scotty %>% select(start_time, src_sub_area)
+```
+
+- Ubah data type `start_time` menjadi datetime dengan fungsi `ymd_hms` dari `lubridate`
+
+```{r}
+scotty$start_time <- ymd_hms(scotty$start_time)
+```
+
+- Bulatkan data datetime menjadi data per jam dengan fungsi `floor_date` dengan `unit = hour`
+
+```{r}
+scotty <- scotty %>% 
+  mutate(datetime = floor_date(x = .$start_time, unit = "hour"))
+```
+
+- Lakukan `group_by` pada `src_sub_area` dan `datetime` untuk mendapatkan jumlah data pada tiap `src_sub_area`, dan beri nama kolom jumlah data tersebut dengan `demand`
+
+```{r}
+scotty <- scotty %>% 
+  group_by(src_sub_area, datetime) %>% 
+  summarise(demand = n())
+```
+
+- Lakukan time series padding agar data datetime terdaftar secara berurutan. Fungsi yang digunakan adalah `pad` dari library `padr
+
+```{r}
+min_date <- min(scotty$datetime) # tentukan datetime paling awal
+max_date <- max(scotty$datetime) # tentukan datetime paling akhir
+
+start_val <- make_datetime(year = year(min_date), month = month(min_date), day = day(min_date), hour = hour(min_date)) # buat dummy datetime berdasarkan min_date
+end_val <- make_datetime(year = year(max_date), month = month(max_date), day = day(max_date), hour = hour(max_date)) # buat dummy datetime berdasarkan max_date
+
+scotty_pad <- padr::pad(x = scotty, start_val = start_val, end_val = end_val)
+```
+
+- Setelah di-padding, akan didapatkan banyak data jam yang kosong pada kolom `demand` sehingga otomatis akan diisi dengan missing values. Ganti NA dengan nilai 0 karena walaupun NA, kita masih membutuhkan data tersebut, dan NA tersebut pada dasarnya mewakili ketiadaan order, alias 0 order.
+
+```{r}
+scotty_pad$demand <- replace_na(scotty_pad$demand, 0)
+```
+
+- Ubah dataframe menjadi objek timeseries dengan fungsi `ts` dan frequency di-set dengan nilai 24 karena kita ingin melihat seasonal harian dari data per jam.
+
+```{r}
+scotty_ts <- ts(scotty_pad$demand, frequency = 24)
+head(scotty_ts)
+```
+
