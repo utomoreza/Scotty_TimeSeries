@@ -23,6 +23,8 @@ kalo liat test data setnya
 
 ```{r}
 library(tidyverse)
+library(ggplot2)
+library(ggfortify)
 library(lubridate)
 library(purrr)
 ```
@@ -47,7 +49,8 @@ scotty <- scotty %>%
 ```{r}
 scotty <- scotty %>% 
   group_by(src_sub_area, datetime) %>% 
-  summarise(demand = n())
+  summarise(demand = n()) %>% 
+  ungroup()
 ```
 
 ```{r}
@@ -63,6 +66,21 @@ scotty_pad <- padr::pad(x = scotty, start_val = start_val, end_val = end_val)
 ```{r}
 scotty_pad$demand <- replace_na(scotty_pad$demand, 0)
 ```
+
+```{r}
+sxk97 <- scotty_pad %>% 
+  filter(src_sub_area == "sxk97") %>%
+  select(datetime, demand)
+```
+
+```{r}
+sxk97_ts <- ts(sxk97$demand, frequency = 24)
+```
+
+```{r}
+sxk97_ts %>% autoplot()
+```
+
 
 ```{r}
 scotty_ts <- ts(scotty_pad$demand, frequency = 24)
