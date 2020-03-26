@@ -74,16 +74,130 @@ sxk97 <- scotty_pad %>%
 ```
 
 ```{r}
-sxk97_ts <- ts(sxk97$demand, frequency = 24)
+sxk97_ts <- ts(sxk97$demand, frequency = 24*7)
+tseries::adf.test(sxk97_ts)
 ```
 
 ```{r}
 sxk97_ts %>% autoplot()
 ```
 
+```{r}
+sxk97_decom <- decompose(x = sxk97_ts, type = "additive")
+decompose(x = sxk97_ts, type = "additive") %>% autoplot()
+```
 
 ```{r}
-scotty_ts <- ts(scotty_pad$demand, frequency = 24)
+sxk97_ets <- forecast::ets(y = sxk97_ts, model = "ZZZ")
+shapiro.test(sxk97_ets$residuals)
+Box.test(sxk97_ets$residuals)
+```
+
+
+```{r}
+# split train-validation 1 seasonal
+train <- head(sxk97_ts, length(sxk97_ts) - 24 * 7)
+validation <- tail(sxk97_ts, 24 * 7)
+```
+
+```{r}
+model_holt_ts<- HoltWinters(train, seasonal = "additive")
+forecast_holt <- forecast::forecast(model_holt_ts, h = 24 * 7)
+MLmetrics::MAE(y_pred = forecast_holt$mean, y_true = validation)
+plot_forecast(forecast_holt, title = "Model Complex Seasonality")
+```
+
+```{r}
+TSstudio::test_forecast(actual = sxk97_ts, forecast.obj = forecast_holt,
+                        train = train, test = validation)
+```
+
+```{r}
+model_sarima <- forecast::auto.arima(train)
+forecast_sarima <- forecast::forecast(model_sarima, h = length(validation))
+TSstudio::plot_forecast(forecast_sarima)
+MLmetrics::MAE(y_pred = forecast_sarima$mean, y_true = validation)
+```
+
+```{r}
+summary(model_sarima)
+```
+
+```{r}
+TSstudio::test_forecast(actual = sxk97_ts, forecast.obj = forecast_sarima,
+                        train = train, test = validation)
+```
+
+```{r}
+forecast::msts(data = sxk97$demand, seasonal.periods = c(24, 24*7)) %>% 
+  forecast::mstl() %>% 
+  autoplot()
+
+sxk97_msts <- forecast::msts(data = sxk97$demand, seasonal.periods = c(24, 24*7))
+```
+
+```{r}
+boxplot(sxk97_mstl[,5])
+max(sxk97_mstl[,5], na.rm = T)
+```
+
+```{r}
+sxk97_mstl <- forecast::mstl(sxk97_msts)
+shapiro.test(sxk97_mstl[,5])
+Box.test(sxk97_mstl[,5])
+```
+
+
+```{r}
+# split train-validation 2 seasonal
+train_2 <- head(sxk97_msts, length(sxk97_msts) - 24 * 7)
+validation_2 <- tail(sxk97_msts, 24 * 7)
+```
+
+```{r}
+model_holt_msts<- HoltWinters(train_2)
+forecast_holt2 <- forecast::forecast(model_holt_msts, h = 24 * 7)
+MLmetrics::MAE(y_pred = forecast_holt2$mean, y_true = validation_2)
+plot_forecast(forecast_holt2)
+```
+
+```{r}
+TSstudio::test_forecast(actual = sxk97_msts, forecast.obj = forecast_holt2,
+                        train = train_2, test = validation_2)
+```
+
+```{r}
+model_sarima2 <- forecast::auto.arima(train_2)
+forecast_sarima2 <- forecast::forecast(model_sarima2, h = length(validation_2))
+TSstudio::plot_forecast(forecast_sarima2)
+MLmetrics::MAE(y_pred = forecast_sarima2$mean, y_true = validation_2)
+```
+
+```{r}
+TSstudio::test_forecast(actual = sxk97_msts, forecast.obj = forecast_sarima2,
+                        train = train_2, test = validation_2)
+```
+
+```{r}
+md_all <- TSstudio::train_model(input = sxk97_msts, 
+                          horizon = 12,
+                          methods = list(
+                            arima = list(method = "auto.arima"),
+                            holtwinter = list(method = "HoltWinters")
+                          ), 
+                          train_method = list(
+                            partitions = 6,
+                            sample.out = 12,
+                            space = 3
+                          ))
+```
+
+```{r}
+
+```
+
+```{r}
+scotty_ts <- ts(scotty_pad$demand, frequency = 24*7*4)
 head(scotty_ts)
 purrr::
 ```
