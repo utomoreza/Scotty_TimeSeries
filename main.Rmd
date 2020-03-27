@@ -21,7 +21,7 @@ untuk padding time series dari library padr::pad()
 Mas itu kayaknya src_sub_area untuk Scotty time series
 kalo liat test data setnya
 
-```{r}
+```{r message=FALSE}
 library(tidyverse)
 library(ggplot2)
 library(ggfortify)
@@ -74,7 +74,7 @@ sxk97 <- scotty_pad %>%
 ```
 
 ```{r}
-sxk97_ts <- ts(sxk97$demand, frequency = 24*7)
+sxk97_ts <- ts(sxk97$demand, frequency = 24)
 tseries::adf.test(sxk97_ts)
 ```
 
@@ -104,7 +104,7 @@ validation <- tail(sxk97_ts, 24 * 7)
 model_holt_ts<- HoltWinters(train, seasonal = "additive")
 forecast_holt <- forecast::forecast(model_holt_ts, h = 24 * 7)
 MLmetrics::MAE(y_pred = forecast_holt$mean, y_true = validation)
-plot_forecast(forecast_holt, title = "Model Complex Seasonality")
+TSstudio::plot_forecast(forecast_holt, title = "Model Complex Seasonality")
 ```
 
 ```{r}
@@ -115,6 +115,13 @@ TSstudio::test_forecast(actual = sxk97_ts, forecast.obj = forecast_holt,
 ```{r}
 model_sarima <- forecast::auto.arima(train)
 forecast_sarima <- forecast::forecast(model_sarima, h = length(validation))
+TSstudio::plot_forecast(forecast_sarima)
+MLmetrics::MAE(y_pred = forecast_sarima$mean, y_true = validation)
+```
+
+```{r}
+model_manualArima <- arima(train, order = c(1,0,2))
+forecast_sarima <- forecast::forecast(model_manualArima, h = length(validation))
 TSstudio::plot_forecast(forecast_sarima)
 MLmetrics::MAE(y_pred = forecast_sarima$mean, y_true = validation)
 ```
@@ -134,6 +141,9 @@ forecast::msts(data = sxk97$demand, seasonal.periods = c(24, 24*7)) %>%
   autoplot()
 
 sxk97_msts <- forecast::msts(data = sxk97$demand, seasonal.periods = c(24, 24*7))
+sxk97_mstsLog <- log(sxk97_msts)
+sxk97_mstsLog %>% forecast::mstl() %>% 
+  autoplot()
 ```
 
 ```{r}
@@ -142,7 +152,7 @@ max(sxk97_mstl[,5], na.rm = T)
 ```
 
 ```{r}
-sxk97_mstl <- forecast::mstl(sxk97_msts)
+sxk97_mstl <- forecast::mstl(sxk97_mstsLog)
 shapiro.test(sxk97_mstl[,5])
 Box.test(sxk97_mstl[,5])
 ```
@@ -162,21 +172,74 @@ plot_forecast(forecast_holt2)
 ```
 
 ```{r}
+forecast_holt2$mean %>% autoplot() + autolayer(validation_2)
+```
+
+```{r}
 TSstudio::test_forecast(actual = sxk97_msts, forecast.obj = forecast_holt2,
                         train = train_2, test = validation_2)
 ```
 
 ```{r}
 model_sarima2 <- forecast::auto.arima(train_2)
-forecast_sarima2 <- forecast::forecast(model_sarima2, h = length(validation_2))
+forecast_sarima2 <- forecast::forecast(model_sarima2, h = 24 * 7)
 TSstudio::plot_forecast(forecast_sarima2)
 MLmetrics::MAE(y_pred = forecast_sarima2$mean, y_true = validation_2)
+```
+
+```{r}
+summary(model_sarima2)
+
+train_2 %>% autoplot()
+forecast_sarima2$mean %>% autoplot() + autolayer(validation_2)
+```
+
+```{r}
+model_sarima2$residuals %>% shapiro.test()# Box.test()# tseries::adf.test()
+hist(model_sarima2$residuals, breaks = 50)
+forecast_sarima2$fitted %>%  autoplot() + autolayer(validation_2)
 ```
 
 ```{r}
 TSstudio::test_forecast(actual = sxk97_msts, forecast.obj = forecast_sarima2,
                         train = train_2, test = validation_2)
 ```
+
+```{r}
+model_sarima3 <- arima(train_2, order = c(2,0,3),
+                       seasonal = list(order = c(1,0,3), period = 24), method = "ML")
+forecast_sarima3 <- forecast::forecast(model_sarima3, h = 24 * 7)
+TSstudio::plot_forecast(forecast_sarima3)
+MLmetrics::MAE(y_pred = forecast_sarima3$mean, y_true = validation_2)
+```
+
+```{r}
+fit <- auto.arima(train_2, max.p = 5 , max.q = 5, max.P = 5, max.Q = 5, max.d = 3,
+                  seasonal = TRUE, ic = 'aicc')
+fore <- forecast::forecast(fit, h = 24 * 7)
+MLmetrics::MAE(y_pred = fore$mean, y_true = validation_2)
+```
+
+```{r}
+forecast::tsdisplay(train_2, lag.max = 96)
+```
+
+p: 1, 2
+d: 0
+q: 0
+
+p: 1, 2
+d: 0
+q: 1, 2, 3, 4, 5
+
+P: 1
+D: 0
+Q: 1, 2, 3
+
+```{r}
+
+```
+
 
 ```{r}
 md_all <- TSstudio::train_model(input = sxk97_msts, 
