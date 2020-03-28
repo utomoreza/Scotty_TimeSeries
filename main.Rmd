@@ -23,7 +23,7 @@ kalo liat test data setnya
 
 ```{r message=FALSE}
 library(tidyverse)
-library(ggplot2)
+# library(ggplot2)
 library(ggfortify)
 library(lubridate)
 library(purrr)
@@ -214,8 +214,9 @@ MLmetrics::MAE(y_pred = forecast_sarima3$mean, y_true = validation_2)
 ```
 
 ```{r}
-fit <- auto.arima(train_2, max.p = 5 , max.q = 5, max.P = 5, max.Q = 5, max.d = 3,
-                  seasonal = TRUE, ic = 'aicc')
+fit <- forecast::auto.arima(train_2, max.p = 5 , 
+                            max.q = 5, max.P = 5, max.Q = 5, max.d = 3,
+                            seasonal = TRUE, ic = 'aicc')
 fore <- forecast::forecast(fit, h = 24 * 7)
 MLmetrics::MAE(y_pred = fore$mean, y_true = validation_2)
 ```
@@ -267,6 +268,81 @@ purrr::
 
 
 ```{r}
+(dim(train)[1]):dim(sxk97)[1]
+idx <- sxk97$datetime[(n+1):N]
+pred <- data.frame(idx = idx, y_pred = predictions, y_true = sxk97$demand[(n+1):N])
 
+library(plotly)
+ggplotly(ggplot(data = pred, mapping = aes(x = idx)) + 
+         geom_line(aes(y = y_pred), color = "blue", show.legend = T) + 
+         geom_line(aes(y = y_true), color = "green", show.legend = T)) 
+  # labs(x = "Date")
+      
+
+MLmetrics::MAE(y_pred = pred$y_pred, y_true = pred$y_true)
+```
+
+```{r}
+sxk9e <- scotty_pad %>% 
+  filter(src_sub_area == "sxk9e") %>%
+  select(datetime, demand)
+```
+
+```{r}
+# tes = diff(sxk9e$demand[(nrow(sxk9e)-1):nrow(sxk9e)], differences = 1)
+tes <- diff(tail(sxk97$demand, 24*7), differences = 1)
+tes <- lags(tes, k=1)
+
+sxk97_lag <- lags(diff(sxk97$demand, differences = 1), k = 1)
+
+std_test  = ((tes - min(sxk97_lag) ) / (max(sxk97_lag) - min(sxk97_lag)  ))
+scaled_test = std_test *(1 -(-1)) + (-1)
+
+scaler= c(min =min(sxk97_lag), max = max(sxk97_lag))
+```
+
+```{r}
+# L = length(x_test)
+x_test <- scaled_test$`x-1`
+L = 24*7
+dim(x_test) = c(length(x_test), 1, 1)
+
+# scaler = Scaled$scaler
+
+predictions = numeric(L)
+X = x_test[1 , , ]
+for(i in 1:L){
+  # X = x_test[i , , ]
+  dim(X) = c(1,1,1)
+  # forecast
+  yhat = model %>% predict(X, batch_size=batch_size)
+  
+  # looping
+  X <- yhat
+  
+  # invert scaling
+  yhat = inverter(yhat, scaler,  c(-1, 1))
+  
+    # invert differencing
+  # yhat  = yhat + Series[(n+i)]
+  
+  # save prediction
+  predictions[i] <- yhat
+}
+# nrow(sxk97)-length(tes)
+preds <- diffinv(predictions, xi = sxk97$demand[1438])
+```
+
+```{r}
+predictions
+```
+
+```{r}
+idx <- tail(sxk97$datetime, 24*7+1)
+pred2 <- data.frame(idx = idx, y_pred = predictions, y_true = tail(sxk97$demand, 24*7+1))
+
+ggplotly(ggplot(data = pred2, mapping = aes(x = idx)) + 
+         geom_line(aes(y = y_pred), color = "blue", show.legend = T) + 
+         geom_line(aes(y = y_true), color = "green", show.legend = T)) 
 ```
 
